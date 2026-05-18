@@ -1,4 +1,4 @@
-# 🚀 Cda Universal Advanced Downloader
+# 🚀 Cda Universal Downloader
 
 Nowoczesna i wielowątkowa aplikacja okienkowa napisana w języku Python, służąca do wygodnego pobierania materiałów wideo oraz audio z ponad 1000 platform internetowych (takich jak CDA, YouTube, Vimeo, TikTok, X/Twitter, Reddit i wiele innych).
 
