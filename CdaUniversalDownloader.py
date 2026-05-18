@@ -1,6 +1,6 @@
 __author__ = "KryskiPL"
 __version__ = "1.0.0"
-__license__ = "MIT"
+__license__ = "GNU GPL v3.0"
 
 import os
 import sys
