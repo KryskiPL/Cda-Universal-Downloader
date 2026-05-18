@@ -359,7 +359,7 @@ tk.Label(ramka_zapisu, text="Zapisz w:", font=("Arial", 10, "bold")).pack(anchor
 ramka_sciezki = tk.Frame(ramka_zapisu)
 ramka_sciezki.pack(fill="x", pady=5)
 
-sciezka_zapisu = tk.StringVar(value=pobierz_katalog_roboczy())
+sciezka_zapisu = tk.StringVar(value=str(Path.home() / "Downloads"))
 pole_sciezki = tk.Entry(ramka_sciezki, textvariable=sciezka_zapisu, font=("Arial", 9), state="readonly", relief="flat")
 pole_sciezki.pack(side="left", fill="x", expand=True)
 
