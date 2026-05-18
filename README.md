@@ -16,7 +16,7 @@ Silnik programu oparty jest na potężnej bibliotece `yt-dlp` oraz narzędziu `F
 
 ## 🖼️ Zrzuty ekranu
 
-*(Tutaj przeciągnij zrzuty ekranu ze swojego komputera do edytora na GitHubie, a linki wygenerują się automatycznie)*
+*(Tutaj  zrzuty ekranu ze swojego komputera do edytora na GitHubie, a linki wygenerują się automatycznie)*
 
 ## 📥 Pobieranie i Instalacja
 
