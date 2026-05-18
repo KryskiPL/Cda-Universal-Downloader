@@ -18,7 +18,7 @@ Silnik programu oparty jest na potężnej bibliotece `yt-dlp` oraz narzędziu `F
 
 *(Tutaj przeciągnij zrzuty ekranu ze swojego komputera do edytora na GitHubie, a linki wygenerują się automatycznie)*
 
-## 📥 Pobieranie i Instalacja (Dla zwykłych użytkowników)
+## 📥 Pobieranie i Instalacja
 
 1. Przejdź do zakładki **[Releases](../../releases)** po prawej stronie repozytorium.
 2. Pobierz najnowszy plik wykonywalny `.exe`.
