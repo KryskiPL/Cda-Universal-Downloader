@@ -23,11 +23,3 @@ Silnik programu oparty jest na potężnej bibliotece `yt-dlp` oraz narzędziu `F
 1. Przejdź do zakładki **[Releases](../../releases)** po prawej stronie repozytorium.
 2. Pobierz najnowszy plik wykonywalny `.exe`.
 3. Uruchom program. Wszystkie niezbędne narzędzia (w tym silnik FFmpeg) są już wbudowane w plik - nie musisz niczego instalować!
-
-## 🛠️ Uruchomienie ze źródeł (Dla programistów)
-
-Jeśli chcesz zmodyfikować kod lub uruchomić program jako skrypt `.py`:
-
-1. Sklonuj repozytorium:
-   ```bash
-   git clone [https://github.com/TwojaNazwaUzytkownika/NazwaTwojegoRepozytorium.git](https://github.com/TwojaNazwaUzytkownika/NazwaTwojegoRepozytorium.git)
