@@ -14,10 +14,6 @@ Silnik programu oparty jest na potężnej bibliotece `yt-dlp` oraz narzędziu `F
 * **Zawsze na wierzchu (Topmost):** Tryb ułatwiający szybkie przeklejanie wielu linków bez konieczności ciągłego przywracania okna.
 * **Czytelny status:** Na bieżąco aktualizowane informacje o prędkości pobierania, postępie procentowym i szacowanym czasie (ETA) dla każdego pliku z osobna.
 
-## 🖼️ Zrzuty ekranu
-
-*(Tutaj  zrzuty ekranu ze swojego komputera do edytora na GitHubie, a linki wygenerują się automatycznie)*
-
 ## 📥 Pobieranie i Instalacja
 
 1. Przejdź do zakładki **[Releases](../../releases)** po prawej stronie repozytorium.
