@@ -311,7 +311,7 @@ except Exception:
 ramka_glowna = tk.LabelFrame(okno, text="", font=("Arial", 10, "bold"), padx=15, pady=10, relief="flat", bd=2)
 ramka_glowna.pack(fill="both", expand=False, padx=15, pady=(15, 5))
 
-instrukcja_label = tk.Label(ramka_glowna, text="Wklej lub przeciągnij linki (np. CDA, YouTube, TikTok, Vimeo itp.):", font=("Arial", 10, "bold"))
+instrukcja_label = tk.Label(ramka_glowna, text="Wklej lub przeciągnij linki (np. CDA, YouTube, TikTok itp.):", font=("Arial", 10, "bold"))
 instrukcja_label.pack(anchor="w", pady=(0, 5))
 
 ramka_linkow = tk.Frame(ramka_glowna)
