@@ -295,7 +295,7 @@ def proces_pobierania(zadanie):
                 del statusy_pobierania[url]
 
 okno = TkinterDnD.Tk() 
-okno.title("Cda Universal Advanced Downloader")
+okno.title(f"Cda Universal Downloader v{__version__}")
 okno.geometry("600x630")
 okno.resizable(False, False)
 
