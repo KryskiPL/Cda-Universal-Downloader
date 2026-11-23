@@ -1,2 +1,6 @@
 yt-dlp
+pycryptodomex
+cryptography
 tkinterdnd2
+selenium
+certifi
