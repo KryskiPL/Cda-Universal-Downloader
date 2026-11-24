@@ -1,5 +1,5 @@
 __author__ = "KryskiPL"
-__version__ = "2.0.3"
+__version__ = "2.0.4"
 __license__ = "GNU GPL v3.0"
 
 import os
@@ -9,6 +9,8 @@ import json
 import html
 import struct
 import ctypes
+import shutil
+import tempfile
 import tkinter as tk
 from tkinter import filedialog
 import customtkinter as ctk
@@ -26,7 +28,7 @@ import base64
 
 if os.name == 'nt':
     try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("KryskiPL.CdaUniversalAdvancedDownloader.2.0.3")
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("KryskiPL.CdaUniversalAdvancedDownloader.2.0.4")
     except Exception:
         pass
 
@@ -278,6 +280,33 @@ def ustaw_ikone_okna(win):
     try:
         win.after(220, _aplikuj)
         win.after(550, _aplikuj)
+    except Exception:
+        pass
+
+def pobierz_bazowy_katalog_temp():
+    baza = os.path.join(tempfile.gettempdir(), "CdaUniversalDownloader_temp")
+    os.makedirs(baza, exist_ok=True)
+    return baza
+
+def pobierz_katalog_temp_zadania(zadanie_id):
+    katalog_t = os.path.join(pobierz_bazowy_katalog_temp(), str(zadanie_id))
+    os.makedirs(katalog_t, exist_ok=True)
+    return katalog_t
+
+def wyczysc_katalog_temp_zadania(zadanie_id):
+    try:
+        katalog_t = os.path.join(pobierz_bazowy_katalog_temp(), str(zadanie_id))
+        if os.path.exists(katalog_t):
+            shutil.rmtree(katalog_t, ignore_errors=True)
+    except Exception:
+        pass
+
+def wyczysc_stare_katalogi_temp():
+    try:
+        baza = os.path.join(tempfile.gettempdir(), "CdaUniversalDownloader_temp")
+        if os.path.exists(baza):
+            shutil.rmtree(baza, ignore_errors=True)
+        os.makedirs(baza, exist_ok=True)
     except Exception:
         pass
 
@@ -1263,6 +1292,7 @@ def zarzadca_kolejki():
                     nastepne.status = "cancelled"
                     nastepne.status_text = "Anulowano"
                     nastepne.touch()
+                    wyczysc_katalog_temp_zadania(nastepne.id)
                     if nastepne.assigned_number is not None:
                         if zwolnij_numer_licznika(nastepne.assigned_number):
                             okno.after(0, odswiez_podglad_licznika)
@@ -1426,7 +1456,7 @@ def pobierz_metadane_mega(org_url):
         "nonce": nonce
     }
 
-def pobierz_z_mega(zadanie, exe_ffmpeg):
+def pobierz_z_mega(zadanie, exe_ffmpeg, katalog_temp):
     org_url = zadanie.url
     katalog = zadanie.katalog
     typ_pobierania = zadanie.typ
@@ -1454,13 +1484,13 @@ def pobierz_z_mega(zadanie, exe_ffmpeg):
     docelowa_baza = assigned_filename if assigned_filename else orig_base
 
     if tylko_audio and orig_ext.lower() != ".mp3":
-        tymczasowy_plik = os.path.join(katalog, f"mega_tmp_{zadanie.id}{orig_ext}")
+        tymczasowy_plik = os.path.join(katalog_temp, f"mega_tmp_{zadanie.id}{orig_ext}")
         koncowy_plik = os.path.join(katalog, f"{docelowa_baza}.mp3")
         zapis_sciezka = tymczasowy_plik
     else:
-        tymczasowy_plik = None
+        tymczasowy_plik = os.path.join(katalog_temp, f"mega_part_{zadanie.id}{orig_ext}")
         koncowy_plik = os.path.join(katalog, f"{docelowa_baza}{orig_ext}")
-        zapis_sciezka = koncowy_plik
+        zapis_sciezka = tymczasowy_plik
 
     with lock:
         zadanie.title = os.path.basename(koncowy_plik)
@@ -1521,16 +1551,22 @@ def pobierz_z_mega(zadanie, exe_ffmpeg):
                         zadanie.status_text = stat_line
                         zadanie.touch()
 
-        if tymczasowy_plik and os.path.exists(tymczasowy_plik):
+        if tylko_audio and orig_ext.lower() != ".mp3" and os.path.exists(zapis_sciezka):
             with lock:
                 zadanie.status = "processing"
-                zadanie.status_text = "Konwersja do MP3..."
+                zadanie.status_text = "Konwersja do MP3 i przenoszenie..."
                 zadanie.touch()
             c_flags = 0x08000000 if os.name == 'nt' else 0
-            cmd = [exe_ffmpeg, '-y', '-i', tymczasowy_plik, '-vn', '-ab', '192k', koncowy_plik]
+            cmd = [exe_ffmpeg, '-y', '-i', zapis_sciezka, '-vn', '-ab', '192k', koncowy_plik]
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=c_flags)
-            if os.path.exists(tymczasowy_plik):
-                os.remove(tymczasowy_plik)
+            if os.path.exists(zapis_sciezka):
+                os.remove(zapis_sciezka)
+        elif os.path.exists(zapis_sciezka):
+            with lock:
+                zadanie.status = "processing"
+                zadanie.status_text = "Przenoszenie do folderu zapisu..."
+                zadanie.touch()
+            shutil.move(zapis_sciezka, koncowy_plik)
 
         with lock:
             zadanie.output_path = koncowy_plik
@@ -1538,11 +1574,6 @@ def pobierz_z_mega(zadanie, exe_ffmpeg):
             zadanie.touch()
 
     except (AnulowanoPrzezUzytkownika, WstrzymanoPrzezUzytkownika):
-        if tymczasowy_plik and os.path.exists(tymczasowy_plik):
-            try:
-                os.remove(tymczasowy_plik)
-            except Exception:
-                pass
         if os.path.exists(zapis_sciezka):
             try:
                 os.remove(zapis_sciezka)
@@ -1550,11 +1581,6 @@ def pobierz_z_mega(zadanie, exe_ffmpeg):
                 pass
         raise
     except Exception:
-        if tymczasowy_plik and os.path.exists(tymczasowy_plik):
-            try:
-                os.remove(tymczasowy_plik)
-            except Exception:
-                pass
         if os.path.exists(zapis_sciezka):
             try:
                 os.remove(zapis_sciezka)
@@ -1578,15 +1604,18 @@ def proces_pobierania(zadanie):
     assigned_number = zadanie.assigned_number
     assigned_filename = zadanie.assigned_filename
 
+    os.makedirs(katalog, exist_ok=True)
+    katalog_temp = pobierz_katalog_temp_zadania(zadanie.id)
+
     sciezka_ffmpeg = resource_path(".")
     exe_ffmpeg = os.path.join(sciezka_ffmpeg, 'ffmpeg.exe')
     if not os.path.exists(exe_ffmpeg):
         exe_ffmpeg = 'ffmpeg'
 
     if assigned_filename:
-        wzor_wyjsciowy = os.path.join(katalog, f"{assigned_filename}.%(ext)s")
+        szablon_wyjsciowy = f"{assigned_filename}.%(ext)s"
     else:
-        wzor_wyjsciowy = os.path.join(katalog, '%(title)s.%(ext)s')
+        szablon_wyjsciowy = '%(title)s.%(ext)s'
 
     aktualny_url = org_url
     special_sub_url = None
@@ -1691,9 +1720,14 @@ def proces_pobierania(zadanie):
                     return
 
         if jest_mega:
-            pobierz_z_mega(zadanie, exe_ffmpeg)
+            pobierz_z_mega(zadanie, exe_ffmpeg, katalog_temp)
             pobieranie_zakonczone_sukcesem = True
             return
+
+        sciezki_ytdlp = {
+            'home': katalog,
+            'temp': katalog_temp
+        }
 
         if jest_domena_retro:
             if not HAS_SELENIUM:
@@ -1792,12 +1826,13 @@ def proces_pobierania(zadanie):
                 else: sub_ext = 'vtt'
 
                 temp_timestamp = f"{int(time.time() * 1000)}_{zadanie.id.split('_')[-1]}"
-                special_temp_video = os.path.join(katalog, f"vid_{temp_timestamp}.mp4")
-                special_temp_sub = os.path.join(katalog, f"sub_{temp_timestamp}.{sub_ext}")
+                special_temp_video = os.path.join(katalog_temp, f"vid_{temp_timestamp}.mp4")
+                special_temp_sub = os.path.join(katalog_temp, f"sub_{temp_timestamp}.{sub_ext}")
                 special_final_video = os.path.join(katalog, f"{vid_title}.mp4" if is_burn else f"{vid_title}.mkv")
-                wzor_wyjsciowy = special_temp_video
+                sciezki_ytdlp = {'home': katalog_temp, 'temp': katalog_temp}
+                szablon_wyjsciowy = os.path.basename(special_temp_video)
             else:
-                wzor_wyjsciowy = os.path.join(katalog, f"{vid_title}.mp4")
+                szablon_wyjsciowy = f"{vid_title}.mp4"
 
         def progress_hook(d):
             nonlocal ostatni_plik_wyjsciowy
@@ -1841,14 +1876,23 @@ def proces_pobierania(zadanie):
                 with lock:
                     zadanie.status = "processing"
                     zadanie.progress = 1.0
-                    zadanie.status_text = "Przetwarzanie pliku..."
+                    zadanie.status_text = "Scalanie i przenoszenie z folderu temp..."
                     zadanie.touch()
+
+        def postprocessor_hook(d):
+            nonlocal ostatni_plik_wyjsciowy
+            if d.get('status') == 'finished':
+                info_dict = d.get('info_dict') or {}
+                fp = info_dict.get('filepath')
+                if fp:
+                    ostatni_plik_wyjsciowy = fp
 
         ydl_logger = YtdlpLogger()
         ydl_opts = bazowe_opcje_ytdlp()
         ydl_opts.update({
             'format': format_wideo if not jest_domena_retro else 'best',
-            'outtmpl': wzor_wyjsciowy,
+            'paths': sciezki_ytdlp,
+            'outtmpl': szablon_wyjsciowy,
             'noplaylist': True,
             'continuedl': True,
             'overwrites': bool(assigned_filename),
@@ -1857,6 +1901,7 @@ def proces_pobierania(zadanie):
             'concurrent_fragment_downloads': 4,
             'ffmpeg_location': sciezka_ffmpeg,
             'progress_hooks': [progress_hook],
+            'postprocessor_hooks': [postprocessor_hook],
             'logger': ydl_logger
         })
 
@@ -1875,7 +1920,7 @@ def proces_pobierania(zadanie):
                 ydl_opts['postprocessors'] = postprocessors
 
         def zastosuj_wybor_uzytkownika(kontynuowac, wlasna_nazwa_wlaczona, nowa_nazwa_uzytkownika, licz_do_licznika_lokalnie, domyslny_tytul):
-            nonlocal assigned_filename, assigned_number, custom_name_enabled, wzor_wyjsciowy
+            nonlocal assigned_filename, assigned_number, custom_name_enabled, szablon_wyjsciowy
             if not kontynuowac:
                 raise AnulowanoPrzezUzytkownika()
 
@@ -1893,8 +1938,8 @@ def proces_pobierania(zadanie):
                 zadanie.assigned_filename = None
                 if domyslny_tytul:
                     zadanie.title = domyslny_tytul
-                wzor_wyjsciowy = os.path.join(katalog, '%(title)s.%(ext)s')
-                ydl_opts['outtmpl'] = wzor_wyjsciowy
+                szablon_wyjsciowy = '%(title)s.%(ext)s'
+                ydl_opts['outtmpl'] = szablon_wyjsciowy
                 ydl_opts['overwrites'] = False
             else:
                 if not licz_do_licznika_lokalnie and assigned_number is not None:
@@ -1918,8 +1963,8 @@ def proces_pobierania(zadanie):
                     assigned_filename = oczyszczona
                     zadanie.assigned_filename = oczyszczona
                     zadanie.title = oczyszczona
-                    wzor_wyjsciowy = os.path.join(katalog, f"{assigned_filename}.%(ext)s")
-                    ydl_opts['outtmpl'] = wzor_wyjsciowy
+                    szablon_wyjsciowy = f"{assigned_filename}.%(ext)s"
+                    ydl_opts['outtmpl'] = szablon_wyjsciowy
                     ydl_opts['overwrites'] = True
 
             if licznik_zmieniony_lokalnie:
@@ -1927,7 +1972,7 @@ def proces_pobierania(zadanie):
                 zapisz_ustawienia()
 
         def przygotuj_fallback_okru(wybrana_wys):
-            nonlocal aktualny_url, wzor_wyjsciowy
+            nonlocal aktualny_url, szablon_wyjsciowy
             with lock:
                 zadanie.status = "checking"
                 zadanie.status_text = "Pobieranie informacji z OK.ru..."
@@ -1963,8 +2008,8 @@ def proces_pobierania(zadanie):
                     docelowa_wys_ok = alternatywa
 
             if not assigned_filename:
-                wzor_wyjsciowy = os.path.join(katalog, f"{tytul_ok}.%(ext)s")
-                ydl_opts['outtmpl'] = wzor_wyjsciowy
+                szablon_wyjsciowy = f"{tytul_ok}.%(ext)s"
+                ydl_opts['outtmpl'] = szablon_wyjsciowy
 
             if strumienie:
                 if docelowa_wys_ok and docelowa_wys_ok in strumienie:
@@ -2059,7 +2104,7 @@ def proces_pobierania(zadanie):
 
         with lock:
             zadanie.status = "downloading"
-            zadanie.status_text = "Inicjowanie pobierania pliku..."
+            zadanie.status_text = "Pobieranie części do folderu temp..."
             zadanie.touch()
 
         try:
@@ -2070,7 +2115,7 @@ def proces_pobierania(zadanie):
                 przygotuj_fallback_okru(docelowa_wysokosc)
                 with lock:
                     zadanie.status = "downloading"
-                    zadanie.status_text = "Inicjowanie pobierania z OK.ru..."
+                    zadanie.status_text = "Pobieranie z OK.ru do folderu temp..."
                     zadanie.touch()
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([aktualny_url])
@@ -2081,7 +2126,7 @@ def proces_pobierania(zadanie):
         if special_sub_url and os.path.exists(special_temp_video):
             with lock:
                 zadanie.status = "processing"
-                zadanie.status_text = "Pobieranie polskich napisów..."
+                zadanie.status_text = "Pobieranie napisów do temp..."
                 zadanie.touch()
 
             try:
@@ -2094,30 +2139,42 @@ def proces_pobierania(zadanie):
                     f.write(sub_data)
 
                 with lock:
-                    zadanie.status_text = "Wypalanie napisów (.mp4)..." if is_burn else "Wklejanie napisów do MKV..."
+                    zadanie.status_text = "Wypalanie napisów (.mp4)..." if is_burn else "Wklejanie napisów i zapisywanie..."
                     zadanie.touch()
 
                 c_flags = 0x08000000 if os.name == 'nt' else 0
                 vid_base = os.path.basename(special_temp_video)
                 sub_base = os.path.basename(special_temp_sub)
-                out_base = os.path.basename(special_final_video)
+                temp_out_name = f"merged_{os.path.basename(special_final_video)}"
 
                 if is_burn:
-                    cmd = [exe_ffmpeg, '-y', '-i', vid_base, '-vf', f"subtitles={sub_base}", '-c:a', 'copy', out_base]
+                    cmd = [exe_ffmpeg, '-y', '-i', vid_base, '-vf', f"subtitles={sub_base}", '-c:a', 'copy', temp_out_name]
                 else:
                     sub_codec = 'ass' if sub_ext == 'ass' else 'srt'
                     cmd = [
                         exe_ffmpeg, '-y', '-i', vid_base, '-i', sub_base,
-                        '-c', 'copy', '-c:s', sub_codec, '-metadata:s:s:0', 'language=pl', out_base
+                        '-c', 'copy', '-c:s', sub_codec, '-metadata:s:s:0', 'language=pl', temp_out_name
                     ]
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=c_flags, cwd=katalog)
-                if os.path.exists(special_temp_video): os.remove(special_temp_video)
-                if os.path.exists(special_temp_sub): os.remove(special_temp_sub)
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=c_flags, cwd=katalog_temp)
+                temp_out_full = os.path.join(katalog_temp, temp_out_name)
+                if os.path.exists(temp_out_full):
+                    shutil.move(temp_out_full, special_final_video)
+                elif os.path.exists(special_temp_video) and not os.path.exists(special_final_video):
+                    shutil.move(special_temp_video, special_final_video)
                 ostatni_plik_wyjsciowy = special_final_video
             except Exception:
                 if os.path.exists(special_temp_video) and not os.path.exists(special_final_video):
-                    os.replace(special_temp_video, special_final_video)
+                    shutil.move(special_temp_video, special_final_video)
                 ostatni_plik_wyjsciowy = special_final_video
+        elif ostatni_plik_wyjsciowy:
+            norm_temp = os.path.normcase(os.path.abspath(katalog_temp))
+            norm_plik = os.path.normcase(os.path.abspath(ostatni_plik_wyjsciowy))
+            if norm_plik.startswith(norm_temp + os.sep):
+                docelowy_w_katalogu = os.path.join(katalog, os.path.basename(ostatni_plik_wyjsciowy))
+                if os.path.exists(ostatni_plik_wyjsciowy) and not os.path.exists(docelowy_w_katalogu):
+                    shutil.move(ostatni_plik_wyjsciowy, docelowy_w_katalogu)
+                if os.path.exists(docelowy_w_katalogu):
+                    ostatni_plik_wyjsciowy = docelowy_w_katalogu
 
         if is_burn and not jest_domena_retro and sub_langs and ostatni_plik_wyjsciowy:
             baza_bez_ext = os.path.splitext(ostatni_plik_wyjsciowy)[0]
@@ -2133,16 +2190,18 @@ def proces_pobierania(zadanie):
                     zadanie.status_text = "Wypalanie napisów w wideo (.mp4)..."
                     zadanie.touch()
                 mp4_src = f"{baza_bez_ext}.mp4"
-                mp4_tmp = f"{baza_bez_ext}_burn_tmp.mp4"
+                temp_srt = os.path.join(katalog_temp, "burn_sub.srt")
+                mp4_tmp = os.path.join(katalog_temp, "burn_out.mp4")
+                shutil.copy2(znalezione_srt, temp_srt)
                 c_flags = 0x08000000 if os.name == 'nt' else 0
                 cmd = [
-                    exe_ffmpeg, '-y', '-i', os.path.basename(mp4_src),
-                    '-vf', f"subtitles={os.path.basename(znalezione_srt)}",
-                    '-c:a', 'copy', os.path.basename(mp4_tmp)
+                    exe_ffmpeg, '-y', '-i', mp4_src,
+                    '-vf', "subtitles=burn_sub.srt",
+                    '-c:a', 'copy', mp4_tmp
                 ]
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=c_flags, cwd=katalog)
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=c_flags, cwd=katalog_temp)
                 if os.path.exists(mp4_tmp):
-                    os.replace(mp4_tmp, mp4_src)
+                    shutil.move(mp4_tmp, mp4_src)
 
         pobieranie_zakonczone_sukcesem = True
 
@@ -2169,10 +2228,11 @@ def proces_pobierania(zadanie):
                     kolejnosc_zadan.remove(zadanie.id)
                 if assigned_number is not None:
                     licznik_zmieniony = zwolnij_numer_licznika(assigned_number)
+                wyczysc_katalog_temp_zadania(zadanie.id)
                 okno.after(0, lambda zid=zadanie.id: usun_karte_ui_bez_blokady(zid))
             elif wstrzymano_zadanie:
                 zadanie.status = "paused"
-                zadanie.status_text = "Wstrzymano (gotowe do wznowienia)"
+                zadanie.status_text = "Wstrzymano (części zachowane w temp)"
                 zadanie.touch()
             elif pobieranie_zakonczone_sukcesem:
                 zadanie.status = "completed"
@@ -2181,6 +2241,7 @@ def proces_pobierania(zadanie):
                 if ostatni_plik_wyjsciowy and not zadanie.output_path:
                     zadanie.output_path = ostatni_plik_wyjsciowy
                 zadanie.touch()
+                wyczysc_katalog_temp_zadania(zadanie.id)
                 if assigned_number is not None:
                     zatwierdz_numer_licznika(assigned_number)
             else:
@@ -2188,6 +2249,7 @@ def proces_pobierania(zadanie):
                     zadanie.status = "cancelled"
                     zadanie.status_text = "Anulowano"
                     zadanie.touch()
+                    wyczysc_katalog_temp_zadania(zadanie.id)
                 if assigned_number is not None:
                     licznik_zmieniony = zwolnij_numer_licznika(assigned_number)
 
@@ -2238,6 +2300,7 @@ def akcja_anuluj_zadanie(zadanie_id):
             zad.status = "cancelled"
             zad.status_text = "Anulowano"
             zad.touch()
+            wyczysc_katalog_temp_zadania(zadanie_id)
             if zad.assigned_number is not None:
                 if zwolnij_numer_licznika(zad.assigned_number):
                     okno.after(0, odswiez_podglad_licznika)
@@ -2277,6 +2340,7 @@ def akcja_usun_zadanie(zadanie_id):
         wszystkie_zadania.pop(zadanie_id, None)
         if zadanie_id in kolejnosc_zadan:
             kolejnosc_zadan.remove(zadanie_id)
+    wyczysc_katalog_temp_zadania(zadanie_id)
     usun_karte_ui_bez_blokady(zadanie_id)
 
 def wyczysc_zakonczone_zadania():
@@ -2887,6 +2951,7 @@ ctk.CTkButton(
 lista_kolejki_scroll = ctk.CTkScrollableFrame(karta_kolejka, corner_radius=8)
 lista_kolejki_scroll.pack(fill="both", expand=True, padx=12, pady=(4, 10))
 
+wyczysc_stare_katalogi_temp()
 aktualizuj_wyglad_sekcji_nazwy()
 przelacz_zawsze_na_wierzchu()
 inicjalizacja_zakonczona = True
